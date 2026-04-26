@@ -3,8 +3,12 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "bin": {
+    "markdown-convert": "./bin/markdown-convert.mjs"
+  },
   "scripts": {
-    "dev": "node server/index.mjs"
+    "dev": "node server/index.mjs",
+    "cli": "node bin/markdown-convert.mjs"
   },
   "dependencies": {
     "@opendocsg/pdf2md": "^0.2.1",

@@ -77,31 +77,79 @@ These heuristics are tuned to be conservative — DOCX and PPTX outputs (which a
 ```
 markdown-convert/
 ├── package.json
+├── bin/
+│   └── markdown-convert.mjs  # CLI entry point (also the npm "bin")
 ├── server/
-│   ├── index.mjs         # Express, serves /public + /api/convert
-│   └── converters.mjs    # docx/pdf/pptx adapters + post-processor
+│   ├── index.mjs             # Express, serves /public + /api/convert
+│   └── converters.mjs        # docx/pdf/pptx adapters + post-processor
 ├── public/
 │   ├── index.html
-│   ├── app.js            # React + HTM, single-page UI
+│   ├── app.js                # React + HTM, single-page UI
 │   └── lib/
-│       ├── htm.js        # React + HTM bindings (loaded from esm.sh)
-│       ├── theme.js      # colour palette
-│       ├── icons.js      # inline SVG icons
-│       └── fsa.js        # File System Access API helpers
+│       ├── htm.js            # React + HTM bindings (loaded from esm.sh)
+│       ├── theme.js          # colour palette
+│       ├── icons.js          # inline SVG icons
+│       └── fsa.js            # File System Access API helpers
 └── scripts/
-    ├── smoke.mjs         # POSTs generated fixtures to a running server
-    ├── smoke-direct.mjs  # calls converters.mjs directly (no server)
-    └── convert-cli.mjs   # one-shot CLI: convert a file from disk
+    ├── smoke.mjs             # POSTs generated fixtures to a running server
+    ├── smoke-direct.mjs      # calls converters.mjs directly (no server)
+    └── test-cli.mjs          # full CLI test matrix (30 assertions)
 ```
 
-## Quick CLI usage
+## CLI
 
-To convert a single file without going through the browser:
+A standalone command-line entry point lives at `bin/markdown-convert.mjs`. It works without the server and is designed to be **agent-friendly**: defaults to stdout for piping, status to stderr, predictable exit codes, JSON mode for programmatic callers.
+
+### Install
 
 ```sh
-node scripts/convert-cli.mjs path/to/document.pdf
-# writes path/to/document.md
+# In the project root, after npm install:
+npm link                       # makes `markdown-convert` available globally
+
+# or install globally straight from GitHub:
+npm install -g github:chamath-bs/markdown-convert --ignore-scripts
 ```
+
+(or just invoke it via `node bin/markdown-convert.mjs ...` / `npm run cli -- ...`)
+
+### Usage
+
+```sh
+markdown-convert FILE                       # markdown to stdout
+markdown-convert FILE -o OUT.md             # write to a specific file
+markdown-convert FILE1 FILE2 --out-dir DIR  # batch convert; FILE.ext → DIR/FILE.md
+markdown-convert FILE --json                # JSON {markdown, warnings, source} per file (NDJSON)
+markdown-convert -h                         # full help
+```
+
+### Exit codes
+
+| Code | Meaning |
+|---|---|
+| 0 | All files converted successfully |
+| 1 | One or more files failed (errors logged to stderr, or surfaced in JSON) |
+| 2 | CLI usage error (bad flags, no input, conflicting options) |
+
+### Examples for coding agents
+
+```sh
+# Pipe a PDF straight into another tool / context
+markdown-convert report.pdf | head -40
+
+# Batch convert a folder of decks
+markdown-convert decks/*.pptx --out-dir build/notes
+
+# JSON for programmatic callers — newline-delimited, one object per file
+markdown-convert *.docx --json | jq -r 'select(.ok) | .markdown'
+```
+
+The `--json` mode emits one object per input file:
+
+```json
+{"source":"/abs/path/report.pdf","ok":true,"output":null,"markdown":"# Title\n…","warnings":["3 image(s) stripped"]}
+```
+
+When `--out-dir` or `-o` is set, `markdown` is omitted (the file already holds it) and `output` is the absolute path.
 
 ## Known limitations
 
