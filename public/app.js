@@ -50,6 +50,7 @@ function App() {
   const [preserveStructure, setPreserveStructure] = useState(true);
   const [running, setRunning] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [skippedCount, setSkippedCount] = useState(0);
   const cancelRef = useRef(false);
   const filesInputRef = useRef(null);
   const folderInputRef = useRef(null);
@@ -67,15 +68,19 @@ function App() {
   const addFiles = useCallback((fileList) => {
     const incoming = Array.from(fileList || []);
     if (incoming.length === 0) return;
+    let skipped = 0;
     setItems((prev) => {
       const existing = new Set(prev.map((p) => p.relativePath + '|' + p.size));
       const next = [...prev];
       for (const f of incoming) {
+        if (!isSupported(f.name)) {
+          skipped++;
+          continue;
+        }
         const relativePath = f.webkitRelativePath || f.name;
         const key = relativePath + '|' + f.size;
         if (existing.has(key)) continue;
         existing.add(key);
-        const supported = isSupported(f.name);
         next.push({
           id: uid(),
           file: f,
@@ -83,13 +88,14 @@ function App() {
           relativePath,
           size: f.size,
           ext: extOf(f.name),
-          status: supported ? 'queued' : 'failed',
-          error: supported ? null : `Unsupported file type (.${extOf(f.name) || '?'})`,
+          status: 'queued',
+          error: null,
           warnings: [],
         });
       }
       return next;
     });
+    if (skipped > 0) setSkippedCount((n) => n + skipped);
   }, []);
 
   const onPickFiles = () => filesInputRef.current?.click();
@@ -106,7 +112,7 @@ function App() {
   };
 
   const removeItem = (id) => setItems((prev) => prev.filter((i) => i.id !== id));
-  const clearAll = () => setItems([]);
+  const clearAll = () => { setItems([]); setSkippedCount(0); };
 
   const onDragOver = (e) => { e.preventDefault(); setDragOver(true); };
   const onDragLeave = () => setDragOver(false);
@@ -280,7 +286,7 @@ function App() {
         <div style=${styles.flexBetween}>
           <div style=${styles.sectionTitle}>3. Convert</div>
           <div style=${{ fontSize: 12, color: C.greyMid }}>
-            ${counts.total} file${counts.total === 1 ? '' : 's'} · ${counts.done} done · ${counts.failed} failed
+            ${counts.total} file${counts.total === 1 ? '' : 's'} · ${counts.done} done · ${counts.failed} failed${skippedCount > 0 ? ` · ${skippedCount} skipped (unsupported)` : ''}
           </div>
         </div>
         <div style=${{ ...styles.row, marginTop: 4 }}>
